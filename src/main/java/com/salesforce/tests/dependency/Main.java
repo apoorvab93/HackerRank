@@ -95,7 +95,7 @@ public class Main {
             requirements.add(currentComponent);
         }
 
-        boolean isCausingCycle = doesCycleExist(component, requirements, graph);
+        boolean isCausingCycle = doesCycleExist_Recursive(component, requirements, graph);
         if (!isCausingCycle)
         {
             graph.put(component, requirements);
@@ -127,6 +127,7 @@ public class Main {
         {
             System.out.println(component+" is already installed");
         }
+
         // explicitly installed components will be tracked separately so that we can prevent their removal in cases
         // where a component dependent on an explicitly installed component is removed
         explicitlyInstalled.add(component);
@@ -183,7 +184,13 @@ public class Main {
             String current = stack.pop();
             boolean canRemove = canBeRemoved(current, inverseGraph, installedSet, itemsRemovable);
             if (!canRemove) {
-                //No need to check its dependencies
+                if(current.equals(component)) // If the root component can't be removed, then none of its dependencies can be removed either
+                {
+                    System.out.println(component +" is still needed");
+                    return;
+                }
+                // Otherwise, (current is not the root but some dependent component.
+                // Now we don't need to check the dependency tree further and can continue with our stack
                 continue;
             }
 
@@ -202,14 +209,10 @@ public class Main {
             }
         }
 
-        if (!itemsRemovable.contains(component)) {
-            System.out.println(component +" is still needed");
-            return;
-        }
-
         // Remove all candidate dependencies
         for (String item : itemsRemovable)
         {
+            // We only allow removal of items that were not explicitly installed or if the explicitly installed one is the same as the one being removed.
             if (!explicitlyInstalled.contains(item) || item.equals(component)) {
                 //Allow removal
                 System.out.println("Removing " + item);
@@ -243,8 +246,44 @@ public class Main {
         return true;
 
     }
+    
+    private static boolean doesCycleExist_Recursive(
+            String component,
+            HashSet<String> requirements,
+            HashMap<String, HashSet<String>> graph) {
+
+        graph.put(component, requirements);
+        boolean retVal = buildDependencyList(component, component, graph);
+        graph.remove(component);
+
+        // If the current component is in the dependency list then we have uncovered a cycle. Stop.
+        return retVal;
+    }
+    
+    private static boolean buildDependencyList(String component, String currentComponent, HashMap<String, HashSet<String>> graph)
+    {
+        if(!graph.containsKey(currentComponent)) {
+            return false;
+        }
+
+        for (String dependency : graph.get(currentComponent)) {
+            if(dependency.equals(component))
+            {
+                System.out.println(currentComponent+" depends on " +component+", ignoring command");
+                return true;
+            }
+
+            boolean retVal = buildDependencyList(component, dependency, graph);
+            if(retVal) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     // This method checks whether a cycle exists if the component and its requirements are added to the dependency graph
+    //Iterative approach
     private static boolean doesCycleExist(
             String component,
             HashSet<String> requirements,
